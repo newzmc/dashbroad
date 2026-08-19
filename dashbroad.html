@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>九巴 619/619X 智能定位看板</title>
+  <title>九巴 619/619X 全線車站實時看板</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes pulse-slow {
@@ -38,10 +38,10 @@
       </div>
     </header>
 
-    <!-- 核心看板：九巴智慧報時 -->
+    <!-- 核心看板：九巴報時 -->
     <main class="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
       
-      <!-- 控制列：路線、方向與車站定位 -->
+      <!-- 控制列：路線、方向與全線車站清單 -->
       <div class="flex flex-col gap-4 border-b border-slate-800 pb-6">
         
         <!-- 路線與方向切換 -->
@@ -53,21 +53,21 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <button id="btn-dir-o" onclick="setDirection('O')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white">📍 往中環 (港澳碼頭)</button>
-            <button id="btn-dir-i" onclick="setDirection('I')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white">📍 往順天方向</button>
+            <button id="btn-dir-o" onclick="setDirection('outbound')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white">📍 往中環 (港澳碼頭)</button>
+            <button id="btn-dir-i" onclick="setDirection('inbound')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white">📍 往順天總站</button>
           </div>
         </div>
 
-        <!-- 車站定位與手動選擇器 -->
+        <!-- 車站選擇（動態完整清單）與 GPS 自動定位 -->
         <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div class="flex items-center gap-2 flex-1">
-            <button onclick="autoLocateNearestStop()" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition" title="點擊 GPS 自動偵測最近車站">
-              🎯 <span>自動定位車站</span>
+            <button onclick="autoLocateNearestStop()" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition" title="點擊依 GPS 定位最近車站">
+              🎯 <span>定位最近站</span>
             </button>
             <div class="flex-1 min-w-0">
-              <label class="block text-[10px] text-slate-400 uppercase font-semibold">目前車站</label>
-              <select id="stop-select" onchange="onManualStopChange(this.value)" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-rose-500 truncate mt-0.5">
-                <option value="">載入車站列表...</option>
+              <label class="block text-[10px] text-slate-400 uppercase font-semibold">選擇全線車站（已載入所有分站）</label>
+              <select id="stop-select" onchange="onStopSelectChange(this.value)" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-rose-500 truncate mt-0.5">
+                <option value="">正在下載九巴全線車站清單...</option>
               </select>
             </div>
           </div>
@@ -76,10 +76,10 @@
           </button>
         </div>
 
-        <!-- 目前選定狀態說明 -->
+        <!-- 狀態說明 -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
-          <div id="location-hint" class="text-emerald-400 font-medium">📍 點擊「自動定位車站」可依據 GPS 距離自動切換</div>
-          <div id="route-desc" class="text-slate-400">常規線：經牛頭角、觀塘道、東隧、灣仔、中環</div>
+          <div id="location-hint" class="text-emerald-400 font-medium">📍 下拉選單已包含該路線所有停靠分站</div>
+          <div id="route-desc" class="text-slate-400">常規線：順天 ⇌ 中環 (港澳碼頭)</div>
         </div>
       </div>
 
@@ -87,7 +87,7 @@
       <div id="eta-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="col-span-1 md:col-span-3 py-10 text-center text-slate-400">
           <div class="inline-block w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-          <div>載入站點班次中...</div>
+          <div>載入站點即時班次中...</div>
         </div>
       </div>
 
@@ -106,30 +106,9 @@
 
   <script>
     let currentRoute = '619';
-    let currentDir = 'O'; // 'O' 往中環 (Outbound), 'I' 往順天 (Inbound)
-    let selectedStop = null;
-    let cachedStops = [];
-
-    // 常用主要站點座標資料庫 (供 GPS 計算距離與備援)
-    const KEY_STOPS = [
-      // 往中環方向 (Dir: O)
-      { name: "觀塘市中心", dir: "O", lat: 22.3130, lng: 114.2238 },
-      { name: "創紀之城", dir: "O", lat: 22.3142, lng: 114.2205 },
-      { name: "牛頭角站", dir: "O", lat: 22.3155, lng: 114.2185 },
-      { name: "東區海底隧道收費廣場", dir: "O", lat: 22.2985, lng: 114.2285 },
-      { name: "舊灣仔警署 / 告士打道", dir: "O", lat: 22.2798, lng: 114.1735 },
-      { name: "海富中心 / 金鐘站", dir: "O", lat: 22.2792, lng: 114.1650 },
-      { name: "中環 (港澳碼頭) 總站", dir: "O", lat: 22.2878, lng: 114.1518 },
-
-      // 往順天方向 (Dir: I)
-      { name: "中環 (港澳碼頭) 總站", dir: "I", lat: 22.2878, lng: 114.1518 },
-      { name: "皇后像廣場 / 遮打道", dir: "I", lat: 22.2815, lng: 114.1602 },
-      { name: "入境事務大樓 / 告士打道", dir: "I", lat: 22.2801, lng: 114.1738 },
-      { name: "東區海底隧道收費廣場", dir: "I", lat: 22.2988, lng: 114.2280 },
-      { name: "觀塘市中心", dir: "I", lat: 22.3128, lng: 114.2245 },
-      { name: "牛頭角站", dir: "I", lat: 22.3158, lng: 114.2190 },
-      { name: "順天總站", dir: "I", lat: 22.3255, lng: 114.2275 }
-    ];
+    let currentDir = 'outbound'; // 'outbound' 往中環, 'inbound' 往順天
+    let currentStopsList = []; // 當前路線方向的所有站點資料 (包含 stop_id, name, lat, lng, seq)
+    let selectedStopId = null;
 
     // 1. 本地時鐘
     function updateClock() {
@@ -163,107 +142,151 @@
         }
         document.getElementById('weather-warning').innerText = warning;
       } catch (e) {
-        console.error(e);
+        console.error('Weather error:', e);
       }
     }
     loadWeather();
     setInterval(loadWeather, 60000);
 
-    // 3. 計算兩點經緯度直線距離 (Haversine Formula，單位：公里)
+    // 3. 計算兩點經緯度直線距離 (公里)
     function calcDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371; // 地球半徑 (km)
+      if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+      const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
       const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
-    // 4. 更新站點下拉選單
-    function renderStopDropdown(nearestStopName = null) {
+    // 4. 動態下載九巴全線站點順序與詳細站名
+    async function loadFullRouteStops() {
       const select = document.getElementById('stop-select');
-      const filtered = KEY_STOPS.filter(s => s.dir === currentDir);
-      
-      select.innerHTML = filtered.map(s => {
-        const isSelected = nearestStopName ? (s.name === nearestStopName) : (selectedStop && selectedStop.name === s.name);
-        return `<option value="${s.name}" ${isSelected ? 'selected' : ''}>${s.name}</option>`;
-      }).join('');
+      select.innerHTML = '<option value="">正在下載全線分站清單...</option>';
 
-      // 若未手動指定，預設選取第一個
-      if (!selectedStop || selectedStop.dir !== currentDir) {
-        selectedStop = filtered[0];
+      try {
+        // A. 取得該路線方向的站序清單
+        const routeStopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${currentRoute}/${currentDir}/1`);
+        const routeStopData = await routeStopRes.json();
+        const rawStops = routeStopData.data || [];
+
+        // B. 並行獲取每個站點的詳細名稱與 GPS 經緯度
+        const stopDetailsPromises = rawStops.map(async (item) => {
+          try {
+            const stopInfoRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
+            const stopInfo = await stopInfoRes.json();
+            return {
+              seq: parseInt(item.seq, 10),
+              stopId: item.stop,
+              name: stopInfo.data ? stopInfo.data.name_tc : `分站 ${item.seq}`,
+              lat: stopInfo.data ? parseFloat(stopInfo.data.lat) : null,
+              lng: stopInfo.data ? parseFloat(stopInfo.data.long) : null
+            };
+          } catch {
+            return { seq: parseInt(item.seq, 10), stopId: item.stop, name: `分站 ${item.seq}`, lat: null, lng: null };
+          }
+        });
+
+        currentStopsList = (await Promise.all(stopDetailsPromises)).sort((a, b) => a.seq - b.seq);
+
+        // 渲染下拉選單
+        select.innerHTML = currentStopsList.map((s, idx) => {
+          return `<option value="${s.stopId}">${s.seq}. ${s.name}</option>`;
+        }).join('');
+
+        if (currentStopsList.length > 0) {
+          selectedStopId = currentStopsList[0].stopId;
+          select.value = selectedStopId;
+        }
+
+        document.getElementById('location-hint').innerText = `✅ 已成功載入全線共 ${currentStopsList.length} 個分站`;
+        fetchBusETA();
+
+      } catch (err) {
+        console.error('Failed to load stops:', err);
+        select.innerHTML = '<option value="">車站清單載入失敗，請重整</option>';
       }
     }
 
-    function onManualStopChange(stopName) {
-      selectedStop = KEY_STOPS.find(s => s.name === stopName && s.dir === currentDir);
-      document.getElementById('location-hint').innerText = `📍 手動選取站點：${selectedStop.name}`;
+    function onStopSelectChange(stopId) {
+      selectedStopId = stopId;
+      const stopObj = currentStopsList.find(s => s.stopId === stopId);
+      if (stopObj) {
+        document.getElementById('location-hint').innerText = `📍 目前選取：${stopObj.seq}. ${stopObj.name}`;
+      }
       fetchBusETA();
     }
 
-    // 5. GPS 自動定位最近車站
+    // 5. GPS 自動比對全線最近車站
     function autoLocateNearestStop() {
       const hint = document.getElementById('location-hint');
       if (!navigator.geolocation) {
-        hint.innerText = '⚠️ 您的瀏覽器不支援 GPS 地理定位';
+        hint.innerText = '⚠️ 您的裝置或瀏覽器不支援 GPS 地理定位';
         return;
       }
 
-      hint.innerText = '🔄 正在取得您的 GPS 位置...';
+      hint.innerText = '🔄 正在取得 GPS 定位並比對全線車站...';
 
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const userLat = pos.coords.latitude;
           const userLng = pos.coords.longitude;
 
-          // 計算當前方向下距離最近的車站
-          const candidateStops = KEY_STOPS.filter(s => s.dir === currentDir);
-          let closest = candidateStops[0];
+          if (!currentStopsList || currentStopsList.length === 0) {
+            hint.innerText = '⚠️ 車站清單尚未下載完成，請稍候再試';
+            return;
+          }
+
+          let closest = currentStopsList[0];
           let minDistance = Infinity;
 
-          candidateStops.forEach(s => {
-            const dist = calcDistance(userLat, userLng, s.lat, s.lng);
-            if (dist < minDistance) {
-              minDistance = dist;
-              closest = s;
+          currentStopsList.forEach(s => {
+            if (s.lat && s.lng) {
+              const dist = calcDistance(userLat, userLng, s.lat, s.lng);
+              if (dist < minDistance) {
+                minDistance = dist;
+                closest = s;
+              }
             }
           });
 
-          selectedStop = closest;
-          renderStopDropdown(closest.name);
+          selectedStopId = closest.stopId;
+          document.getElementById('stop-select').value = closest.stopId;
 
           const distText = minDistance < 1 
             ? `${Math.round(minDistance * 1000)} 公尺` 
             : `${minDistance.toFixed(2)} 公里`;
 
-          hint.innerText = `🎯 已自動定位最近站點：${closest.name} (距離約 ${distText})`;
+          hint.innerText = `🎯 已自動定位最近站點：${closest.seq}. ${closest.name} (距離約 ${distText})`;
           fetchBusETA();
         },
         (err) => {
-          hint.innerText = '⚠️ 無法取得定位權限，已維持手動選取站點';
+          hint.innerText = '⚠️ 無法取得 GPS 權限，已維持手動選取站點';
         },
         { timeout: 8000, enableHighAccuracy: true }
       );
     }
 
-    // 6. 抓取九巴實時班次
+    // 6. 抓取該站點的實時班次 (Stop-ETA API)
     async function fetchBusETA() {
+      if (!selectedStopId) return;
+
       const container = document.getElementById('eta-container');
       const now = new Date();
 
       try {
-        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${currentRoute}/1`);
-        if (!res.ok) throw new Error('API 回應異常');
+        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/eta/${selectedStopId}/${currentRoute}/1`);
+        if (!res.ok) throw new Error('API 連線失敗');
         const json = await res.json();
 
-        // 依方向篩選未過時班次
+        // 依服務方向篩選
+        const dirFlag = currentDir === 'outbound' ? 'O' : 'I';
         const validList = (json.data || [])
-          .filter(item => item.dir === currentDir && item.eta && new Date(item.eta) >= now)
+          .filter(item => (item.dir === dirFlag || !item.dir) && item.eta && new Date(item.eta) >= now)
           .sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-        // 剔除重複班次，取最近 3 班
+        // 取前 3 班
         const uniqueEtas = [];
         const seen = new Set();
         for (const item of validList) {
@@ -277,9 +300,9 @@
         if (uniqueEtas.length === 0) {
           container.innerHTML = `
             <div class="col-span-1 md:col-span-3 py-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800">
-              <div class="text-amber-400 text-base font-bold">${currentRoute} 目前非服務時間或暫無班次</div>
+              <div class="text-amber-400 text-base font-bold">${currentRoute} 此站目前暫無即時班次預報</div>
               <div class="text-slate-500 text-xs mt-1">
-                ${currentRoute === '619X' ? '619X 主要於平日早晚繁時行駛' : '619 正常營運時間約為 06:00 - 00:00'}
+                ${currentRoute === '619X' ? '619X 主要於平日早晚繁時行駛' : '可能是非服務時段或尚未發車'}
               </div>
             </div>
           `;
@@ -313,7 +336,7 @@
 
         document.getElementById('last-updated').innerText = `最後更新: ${now.toLocaleTimeString('zh-HK', { hour12: false })}`;
       } catch (err) {
-        console.error('KMB ETA error:', err);
+        console.error('ETA load error:', err);
         container.innerHTML = `
           <div class="col-span-1 md:col-span-3 py-6 text-center text-rose-400 bg-rose-950/20 rounded-2xl border border-rose-900/40">
             <div class="font-bold">⚠️ 無法連線至九巴 API</div>
@@ -325,6 +348,7 @@
 
     // 切換路線 (619 / 619X)
     function setRoute(route) {
+      if (currentRoute === route) return;
       currentRoute = route;
       document.getElementById('btn-619').className = route === '619' 
         ? "px-3.5 py-1.5 rounded-xl font-bold text-sm bg-rose-600 text-white shadow-lg shadow-rose-900/40"
@@ -334,30 +358,30 @@
         : "px-3.5 py-1.5 rounded-xl font-bold text-sm bg-slate-800 text-slate-400 hover:text-white";
       
       document.getElementById('route-desc').innerText = route === '619X'
-        ? '繁時特快：經觀塘繞道、東隧直達港島（主要於平日繁忙時間行駛）'
-        : '常規線：經牛頭角、觀塘道、東隧、灣仔、中環';
+        ? '繁時特快：順天 ⇌ 中環 (港澳碼頭) 經觀塘繞道'
+        : '常規線：順天 ⇌ 中環 (港澳碼頭) 經牛頭角、觀塘道、東隧';
 
-      fetchBusETA();
+      loadFullRouteStops();
     }
 
-    // 切換方向 (O: 往中環 / I: 往順天)
+    // 切換方向 (outbound 往中環 / inbound 往順天)
     function setDirection(dir) {
+      if (currentDir === dir) return;
       currentDir = dir;
-      document.getElementById('btn-dir-o').className = dir === 'O'
+      document.getElementById('btn-dir-o').className = dir === 'outbound'
         ? "px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white"
         : "px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white";
-      document.getElementById('btn-dir-i').className = dir === 'I'
+      document.getElementById('btn-dir-i').className = dir === 'inbound'
         ? "px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white"
         : "px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white";
 
-      renderStopDropdown();
-      fetchBusETA();
+      loadFullRouteStops();
     }
 
-    // 初始載入與自動嘗試定位
-    renderStopDropdown();
-    fetchBusETA();
-    autoLocateNearestStop();
+    // 初始化載入
+    loadFullRouteStops().then(() => {
+      autoLocateNearestStop();
+    });
     setInterval(fetchBusETA, 30000);
   </script>
 </body>
