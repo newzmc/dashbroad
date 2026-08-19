@@ -3,89 +3,133 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>九巴 619 / 619X 實時看板</title>
+  <title>九巴 619/619X 智能定位看板</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @keyframes pulse-slow {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
-    .live-indicator { animation: pulse-slow 2s infinite; }
+    .live-dot { animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans flex flex-col justify-between">
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans flex flex-col justify-between selection:bg-rose-500 selection:text-white">
 
   <div class="max-w-4xl mx-auto w-full space-y-6">
     
-    <!-- 頂部資訊：時間與天氣 -->
-    <header class="bg-slate-900 border border-slate-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <!-- 頂部資訊列：香港時間與天文台天氣 -->
+    <header class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-2xl backdrop-blur-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
       <div>
         <div class="flex items-center space-x-2 text-rose-500 text-xs font-bold uppercase tracking-wider mb-1">
-          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 live-indicator"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 live-dot"></span>
           <span>香港時間 (HKT)</span>
         </div>
         <div id="live-clock" class="text-5xl md:text-6xl font-black font-mono tracking-tight text-white">--:--:--</div>
         <div id="live-date" class="text-slate-400 mt-1 text-sm md:text-base">載入日期中...</div>
       </div>
 
-      <div class="bg-slate-950/60 border border-slate-800/80 p-4 rounded-2xl min-w-[200px] text-right">
+      <div class="bg-slate-950/60 border border-slate-800 p-4 rounded-2xl min-w-[220px] text-right">
         <div class="text-xs font-semibold text-slate-400 uppercase">香港天文台實時天氣</div>
-        <div id="weather-temp" class="text-4xl font-black text-amber-400 my-1">--°C</div>
-        <div id="weather-humidity" class="text-xs text-slate-300">濕度: --%</div>
-        <div id="weather-warning" class="text-[11px] text-amber-300 mt-1 truncate">載入中...</div>
+        <div class="flex items-baseline justify-end space-x-3 my-1">
+          <span id="weather-temp" class="text-4xl font-black text-amber-400">--°C</span>
+          <span id="weather-humidity" class="text-xs text-slate-300">濕度: --%</span>
+        </div>
+        <div id="weather-warning" class="text-[11px] text-amber-300 truncate">載入中...</div>
       </div>
     </header>
 
-    <!-- 核心看板：九巴報時 -->
-    <main class="bg-slate-900 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-xl space-y-6">
+    <!-- 核心看板：九巴智慧報時 -->
+    <main class="bg-slate-900/90 border border-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl space-y-6">
       
-      <!-- 控制列：路線與方向切換 -->
-      <div class="flex flex-col gap-4 border-b border-slate-800 pb-5">
+      <!-- 控制列：路線、方向與車站定位 -->
+      <div class="flex flex-col gap-4 border-b border-slate-800 pb-6">
+        
+        <!-- 路線與方向切換 -->
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <!-- 路線選擇 -->
           <div class="flex items-center gap-2">
             <span class="text-xs text-slate-400 font-bold">路線:</span>
             <button id="btn-619" onclick="setRoute('619')" class="px-3.5 py-1.5 rounded-xl font-bold text-sm bg-rose-600 text-white shadow-lg shadow-rose-900/40">619</button>
             <button id="btn-619x" onclick="setRoute('619X')" class="px-3.5 py-1.5 rounded-xl font-bold text-sm bg-slate-800 text-slate-400 hover:text-white">619X (特快)</button>
           </div>
 
-          <!-- 方向選擇 -->
           <div class="flex items-center gap-2">
-            <button id="btn-dir-o" onclick="setDirection('O')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white">📍 往中環 (經觀塘)</button>
-            <button id="btn-dir-i" onclick="setDirection('I')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white">📍 往順天 (中環開出)</button>
-            <button onclick="fetchAllData()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition" title="立即刷新">🔄</button>
+            <button id="btn-dir-o" onclick="setDirection('O')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white">📍 往中環 (港澳碼頭)</button>
+            <button id="btn-dir-i" onclick="setDirection('I')" class="px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white">📍 往順天方向</button>
           </div>
         </div>
 
-        <div id="route-header-text" class="text-lg md:text-xl font-bold text-slate-200">
-          九巴 619 ➔ 往中環 (港澳碼頭)
+        <!-- 車站定位與手動選擇器 -->
+        <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-1">
+            <button onclick="autoLocateNearestStop()" class="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 transition" title="點擊 GPS 自動偵測最近車站">
+              🎯 <span>自動定位車站</span>
+            </button>
+            <div class="flex-1 min-w-0">
+              <label class="block text-[10px] text-slate-400 uppercase font-semibold">目前車站</label>
+              <select id="stop-select" onchange="onManualStopChange(this.value)" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-rose-500 truncate mt-0.5">
+                <option value="">載入車站列表...</option>
+              </select>
+            </div>
+          </div>
+          <button onclick="fetchBusETA()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-semibold transition shrink-0 flex items-center justify-center gap-1">
+            🔄 <span>刷新</span>
+          </button>
+        </div>
+
+        <!-- 目前選定狀態說明 -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+          <div id="location-hint" class="text-emerald-400 font-medium">📍 點擊「自動定位車站」可依據 GPS 距離自動切換</div>
+          <div id="route-desc" class="text-slate-400">常規線：經牛頭角、觀塘道、東隧、灣仔、中環</div>
         </div>
       </div>
 
-      <!-- 班次卡片網格 -->
+      <!-- ETA 班次卡片網格 -->
       <div id="eta-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="col-span-1 md:col-span-3 py-10 text-center text-slate-400">
           <div class="inline-block w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-          <div>正在連線香港政府開放 API...</div>
+          <div>載入站點班次中...</div>
         </div>
       </div>
 
-      <!-- 狀態列 -->
+      <!-- 狀態提示列 -->
       <div class="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-800/40">
-        <span id="api-status">連線狀態: 偵測中</span>
-        <span id="last-update">最後更新: --</span>
+        <span id="sync-status">每 30 秒自動更新數據</span>
+        <span id="last-updated">最後更新: --</span>
       </div>
     </main>
 
   </div>
 
   <footer class="text-center text-xs text-slate-600 mt-6">
-    數據直連：香港天文台 (HKO) & 九巴開放 API (data.etabus.gov.hk)
+    數據來源：香港天文台 (HKO) & 香港政府開放數據平台 (DATA.GOV.HK)
   </footer>
 
   <script>
     let currentRoute = '619';
-    let currentDir = 'O'; // 'O' 往中環, 'I' 往順天
+    let currentDir = 'O'; // 'O' 往中環 (Outbound), 'I' 往順天 (Inbound)
+    let selectedStop = null;
+    let cachedStops = [];
+
+    // 常用主要站點座標資料庫 (供 GPS 計算距離與備援)
+    const KEY_STOPS = [
+      // 往中環方向 (Dir: O)
+      { name: "觀塘市中心", dir: "O", lat: 22.3130, lng: 114.2238 },
+      { name: "創紀之城", dir: "O", lat: 22.3142, lng: 114.2205 },
+      { name: "牛頭角站", dir: "O", lat: 22.3155, lng: 114.2185 },
+      { name: "東區海底隧道收費廣場", dir: "O", lat: 22.2985, lng: 114.2285 },
+      { name: "舊灣仔警署 / 告士打道", dir: "O", lat: 22.2798, lng: 114.1735 },
+      { name: "海富中心 / 金鐘站", dir: "O", lat: 22.2792, lng: 114.1650 },
+      { name: "中環 (港澳碼頭) 總站", dir: "O", lat: 22.2878, lng: 114.1518 },
+
+      // 往順天方向 (Dir: I)
+      { name: "中環 (港澳碼頭) 總站", dir: "I", lat: 22.2878, lng: 114.1518 },
+      { name: "皇后像廣場 / 遮打道", dir: "I", lat: 22.2815, lng: 114.1602 },
+      { name: "入境事務大樓 / 告士打道", dir: "I", lat: 22.2801, lng: 114.1738 },
+      { name: "東區海底隧道收費廣場", dir: "I", lat: 22.2988, lng: 114.2280 },
+      { name: "觀塘市中心", dir: "I", lat: 22.3128, lng: 114.2245 },
+      { name: "牛頭角站", dir: "I", lat: 22.3158, lng: 114.2190 },
+      { name: "順天總站", dir: "I", lat: 22.3255, lng: 114.2275 }
+    ];
 
     // 1. 本地時鐘
     function updateClock() {
@@ -101,13 +145,12 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // 2. 直連天文台天氣 API
+    // 2. 香港天文台實時天氣
     async function loadWeather() {
       try {
         const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=tc');
-        if (!res.ok) throw new Error('HKO HTTP ' + res.status);
+        if (!res.ok) return;
         const data = await res.json();
-        
         const kt = data.temperature.data.find(i => i.place === '觀塘') || data.temperature.data[0];
         document.getElementById('weather-temp').innerText = `${kt.value}°C`;
         document.getElementById('weather-humidity').innerText = `濕度: ${data.humidity.data[0].value}%`;
@@ -119,29 +162,108 @@
           warning = `UV 指數: ${data.uvindex.data[0].value} (${data.uvindex.data[0].desc})`;
         }
         document.getElementById('weather-warning').innerText = warning;
-      } catch (err) {
-        console.error('Weather load failed:', err);
-        document.getElementById('weather-temp').innerText = '--°C';
-        document.getElementById('weather-warning').innerText = '天氣暫時無法取得';
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    loadWeather();
+    setInterval(loadWeather, 60000);
+
+    // 3. 計算兩點經緯度直線距離 (Haversine Formula，單位：公里)
+    function calcDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371; // 地球半徑 (km)
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // 4. 更新站點下拉選單
+    function renderStopDropdown(nearestStopName = null) {
+      const select = document.getElementById('stop-select');
+      const filtered = KEY_STOPS.filter(s => s.dir === currentDir);
+      
+      select.innerHTML = filtered.map(s => {
+        const isSelected = nearestStopName ? (s.name === nearestStopName) : (selectedStop && selectedStop.name === s.name);
+        return `<option value="${s.name}" ${isSelected ? 'selected' : ''}>${s.name}</option>`;
+      }).join('');
+
+      // 若未手動指定，預設選取第一個
+      if (!selectedStop || selectedStop.dir !== currentDir) {
+        selectedStop = filtered[0];
       }
     }
 
-    // 3. 直連九巴官方開放 API
-    async function loadBus() {
+    function onManualStopChange(stopName) {
+      selectedStop = KEY_STOPS.find(s => s.name === stopName && s.dir === currentDir);
+      document.getElementById('location-hint').innerText = `📍 手動選取站點：${selectedStop.name}`;
+      fetchBusETA();
+    }
+
+    // 5. GPS 自動定位最近車站
+    function autoLocateNearestStop() {
+      const hint = document.getElementById('location-hint');
+      if (!navigator.geolocation) {
+        hint.innerText = '⚠️ 您的瀏覽器不支援 GPS 地理定位';
+        return;
+      }
+
+      hint.innerText = '🔄 正在取得您的 GPS 位置...';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const userLat = pos.coords.latitude;
+          const userLng = pos.coords.longitude;
+
+          // 計算當前方向下距離最近的車站
+          const candidateStops = KEY_STOPS.filter(s => s.dir === currentDir);
+          let closest = candidateStops[0];
+          let minDistance = Infinity;
+
+          candidateStops.forEach(s => {
+            const dist = calcDistance(userLat, userLng, s.lat, s.lng);
+            if (dist < minDistance) {
+              minDistance = dist;
+              closest = s;
+            }
+          });
+
+          selectedStop = closest;
+          renderStopDropdown(closest.name);
+
+          const distText = minDistance < 1 
+            ? `${Math.round(minDistance * 1000)} 公尺` 
+            : `${minDistance.toFixed(2)} 公里`;
+
+          hint.innerText = `🎯 已自動定位最近站點：${closest.name} (距離約 ${distText})`;
+          fetchBusETA();
+        },
+        (err) => {
+          hint.innerText = '⚠️ 無法取得定位權限，已維持手動選取站點';
+        },
+        { timeout: 8000, enableHighAccuracy: true }
+      );
+    }
+
+    // 6. 抓取九巴實時班次
+    async function fetchBusETA() {
       const container = document.getElementById('eta-container');
       const now = new Date();
 
       try {
         const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${currentRoute}/1`);
-        if (!res.ok) throw new Error('KMB HTTP ' + res.status);
+        if (!res.ok) throw new Error('API 回應異常');
         const json = await res.json();
 
-        // 依方向 (O/I) 篩選有效班次，並按預計到達時間由近到遠排序
+        // 依方向篩選未過時班次
         const validList = (json.data || [])
           .filter(item => item.dir === currentDir && item.eta && new Date(item.eta) >= now)
           .sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-        // 剔除重複 timestamp
+        // 剔除重複班次，取最近 3 班
         const uniqueEtas = [];
         const seen = new Set();
         for (const item of validList) {
@@ -161,49 +283,47 @@
               </div>
             </div>
           `;
-          document.getElementById('api-status').innerText = '連線狀態: 成功取得數據 (暫無班次)';
-          document.getElementById('last-update').innerText = `更新時間: ${now.toLocaleTimeString('zh-HK', { hour12: false })}`;
+          document.getElementById('last-updated').innerText = `最後查詢: ${now.toLocaleTimeString('zh-HK', { hour12: false })}`;
           return;
         }
 
         container.innerHTML = uniqueEtas.map((bus, idx) => {
           const etaDate = new Date(bus.eta);
           const diffMins = Math.max(0, Math.round((etaDate - now) / 60000));
-          const isArrivingSoon = diffMins <= 3;
+          const isArriving = diffMins <= 3;
 
           return `
-            <div class="bg-slate-950/80 p-5 rounded-2xl border ${isArrivingSoon ? 'border-amber-500 bg-amber-500/10' : 'border-slate-800'} flex flex-col justify-between text-center">
+            <div class="bg-slate-950/80 p-5 rounded-2xl border ${isArriving ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/30' : 'border-slate-800'} flex flex-col justify-between text-center transition hover:border-slate-700">
               <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
-                <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300">第 ${idx + 1} 班 (${bus.route})</span>
-                <span class="${bus.rmk_tc ? 'text-amber-400' : 'text-slate-500'}">${bus.rmk_tc || '實時班次'}</span>
+                <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-semibold">第 ${idx + 1} 班 (${bus.route})</span>
+                <span class="${bus.rmk_tc ? 'text-amber-400 font-medium' : 'text-slate-500'}">${bus.rmk_tc || '實時班次'}</span>
               </div>
               <div class="my-3">
-                <div class="text-4xl font-black font-mono ${isArrivingSoon ? 'text-amber-400' : 'text-emerald-400'}">
-                  ${diffMins} <span class="text-sm font-normal text-slate-400">分鐘</span>
+                <div class="text-4xl font-black font-mono ${isArriving ? 'text-amber-400' : 'text-emerald-400'}">
+                  ${diffMins} <span class="text-sm font-normal text-slate-400 font-sans">分鐘</span>
                 </div>
               </div>
               <div class="text-xs font-mono text-slate-400 border-t border-slate-800/80 pt-2 flex justify-between">
                 <span>往: ${bus.dest_tc || '--'}</span>
-                <span>${etaDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span>預計 ${etaDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>
           `;
         }).join('');
 
-        document.getElementById('api-status').innerText = '連線狀態: 正常 (直連九巴 API)';
-        document.getElementById('last-update').innerText = `更新時間: ${now.toLocaleTimeString('zh-HK', { hour12: false })}`;
+        document.getElementById('last-updated').innerText = `最後更新: ${now.toLocaleTimeString('zh-HK', { hour12: false })}`;
       } catch (err) {
-        console.error('KMB load failed:', err);
+        console.error('KMB ETA error:', err);
         container.innerHTML = `
           <div class="col-span-1 md:col-span-3 py-6 text-center text-rose-400 bg-rose-950/20 rounded-2xl border border-rose-900/40">
             <div class="font-bold">⚠️ 無法連線至九巴 API</div>
             <div class="text-xs text-rose-300 mt-1">${err.message}</div>
           </div>
         `;
-        document.getElementById('api-status').innerText = '連線狀態: 連線失敗';
       }
     }
 
+    // 切換路線 (619 / 619X)
     function setRoute(route) {
       currentRoute = route;
       document.getElementById('btn-619').className = route === '619' 
@@ -213,10 +333,14 @@
         ? "px-3.5 py-1.5 rounded-xl font-bold text-sm bg-rose-600 text-white shadow-lg shadow-rose-900/40"
         : "px-3.5 py-1.5 rounded-xl font-bold text-sm bg-slate-800 text-slate-400 hover:text-white";
       
-      updateTitle();
-      loadBus();
+      document.getElementById('route-desc').innerText = route === '619X'
+        ? '繁時特快：經觀塘繞道、東隧直達港島（主要於平日繁忙時間行駛）'
+        : '常規線：經牛頭角、觀塘道、東隧、灣仔、中環';
+
+      fetchBusETA();
     }
 
+    // 切換方向 (O: 往中環 / I: 往順天)
     function setDirection(dir) {
       currentDir = dir;
       document.getElementById('btn-dir-o').className = dir === 'O'
@@ -226,22 +350,15 @@
         ? "px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-rose-600 text-white"
         : "px-3.5 py-1.5 rounded-xl font-bold text-xs md:text-sm bg-slate-800 text-slate-400 hover:text-white";
 
-      updateTitle();
-      loadBus();
+      renderStopDropdown();
+      fetchBusETA();
     }
 
-    function updateTitle() {
-      const dirLabel = currentDir === 'O' ? '往中環 (港澳碼頭)' : '往順天 (中環開出)';
-      document.getElementById('route-header-text').innerText = `九巴 ${currentRoute} ➔ ${dirLabel}`;
-    }
-
-    function fetchAllData() {
-      loadWeather();
-      loadBus();
-    }
-
-    fetchAllData();
-    setInterval(fetchAllData, 30000);
+    // 初始載入與自動嘗試定位
+    renderStopDropdown();
+    fetchBusETA();
+    autoLocateNearestStop();
+    setInterval(fetchBusETA, 30000);
   </script>
 </body>
 </html>
